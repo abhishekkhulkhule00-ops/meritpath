@@ -1,0 +1,576 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- GLOBAL HELPERS ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isBootstrappedAdmin() {
+      return isSignedIn() &&
+             request.auth.token.email_verified == true &&
+             request.auth.token.email == 'abhishekkhulkhule@gmail.com';
+    }
+
+    function hasActiveAdminDoc() {
+      return isSignedIn() &&
+             exists(/databases/$(database)/documents/admins/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.active == true;
+    }
+
+    function isAdmin() {
+      return isBootstrappedAdmin() || hasActiveAdminDoc();
+    }
+
+    function isSuperAdmin() {
+      return isBootstrappedAdmin() ||
+             (hasActiveAdminDoc() &&
+              get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.role == 'SUPER_ADMIN');
+    }
+
+    function isStaffCounsellorOrAdmin() {
+      return isBootstrappedAdmin() ||
+             (hasActiveAdminDoc() &&
+              get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.role in ['SUPER_ADMIN', 'ADMIN', 'COUNSELLOR']);
+    }
+
+    function isStaffCatalogManager() {
+      return isBootstrappedAdmin() ||
+             (hasActiveAdminDoc() &&
+              get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.role in ['SUPER_ADMIN', 'ADMIN', 'DATA_MANAGER']);
+    }
+
+    function isValidTimestamp(ts) {
+      return ts is timestamp && ts <= request.time;
+    }
+
+    // --- VALIDATION HELPERS ---
+
+    function isValidAdminUser(data) {
+      return data.uid is string && data.uid.size() >= 1 && data.uid.size() <= 128 &&
+             data.email is string && data.email.size() >= 3 && data.email.size() <= 200 &&
+             data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 120 &&
+             data.role in ['SUPER_ADMIN', 'ADMIN', 'COUNSELLOR', 'DATA_MANAGER'] &&
+             data.permissions is list && data.permissions.size() <= 20 &&
+             (data.permissions.size() == 0 || data.permissions[0] is string) &&
+             data.active is bool &&
+             (!('specialization' in data) || (data.specialization is string && data.specialization.size() <= 120)) &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidStudentProfile(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.studentCode is string && data.studentCode.size() >= 3 && data.studentCode.size() <= 40 &&
+             data.fullName is string && data.fullName.size() >= 1 && data.fullName.size() <= 120 &&
+             data.email is string && data.email.size() <= 200 &&
+             (!('mobile' in data) || (data.mobile is string && data.mobile.size() <= 20)) &&
+             (!('dob' in data) || (data.dob is string && data.dob.size() <= 30)) &&
+             (!('gender' in data) || (data.gender is string && data.gender.size() <= 30)) &&
+             (!('state' in data) || (data.state is string && data.state.size() <= 60)) &&
+             (!('district' in data) || (data.district is string && data.district.size() <= 60)) &&
+             (!('domicile' in data) || (data.domicile is string && data.domicile.size() <= 60)) &&
+             (!('preferredCourseId' in data) || (data.preferredCourseId is string && data.preferredCourseId.size() <= 128)) &&
+             (!('preferredCourseName' in data) || (data.preferredCourseName is string && data.preferredCourseName.size() <= 120)) &&
+             (!('entranceExam' in data) || (data.entranceExam is string && data.entranceExam.size() <= 80)) &&
+             (!('examScore' in data) || (data.examScore is number && data.examScore >= 0 && data.examScore <= 1000)) &&
+             (!('percentile' in data) || (data.percentile is number && data.percentile >= 0 && data.percentile <= 100)) &&
+             (!('rank' in data) || (data.rank is int && data.rank >= 0 && data.rank <= 5000000)) &&
+             (!('category' in data) || (data.category is string && data.category.size() <= 40)) &&
+             (!('subcategory' in data) || (data.subcategory is string && data.subcategory.size() <= 60)) &&
+             (!('budgetMax' in data) || (data.budgetMax is int && data.budgetMax >= 0 && data.budgetMax <= 100000000)) &&
+             (!('preferredLocations' in data) || (data.preferredLocations is string && data.preferredLocations.size() <= 250)) &&
+             (!('tenthPercent' in data) || (data.tenthPercent is number && data.tenthPercent >= 0 && data.tenthPercent <= 100)) &&
+             (!('twelfthPercent' in data) || (data.twelfthPercent is number && data.twelfthPercent >= 0 && data.twelfthPercent <= 100)) &&
+             data.counsellingStatus in ['NEW', 'PENDING', 'CONTACTED', 'SCHEDULED', 'IN_COUNSELLING', 'COMPLETED', 'CANCELLED'] &&
+             (!('assignedCounsellorId' in data) || (data.assignedCounsellorId is string && data.assignedCounsellorId.size() <= 128)) &&
+             (!('assignedCounsellorName' in data) || (data.assignedCounsellorName is string && data.assignedCounsellorName.size() <= 120)) &&
+             (!('internalNotes' in data) || (data.internalNotes is string && data.internalNotes.size() <= 1000)) &&
+             data.blocked is bool &&
+             (!('referralCode' in data) || (data.referralCode is string && data.referralCode.size() <= 40)) &&
+             (!('documentChecklist' in data) || (data.documentChecklist is list && data.documentChecklist.size() <= 25)) &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidCourse(data) {
+      return data.name is string && data.name.size() >= 1 && data.name.size() <= 120 &&
+             data.code is string && data.code.size() >= 1 && data.code.size() <= 40 &&
+             data.description is string && data.description.size() <= 1000 &&
+             data.eligibility is string && data.eligibility.size() <= 500 &&
+             data.duration is string && data.duration.size() <= 60 &&
+             data.entranceExam is string && data.entranceExam.size() <= 120 &&
+             data.active is bool &&
+             data.displayOrder is int && data.displayOrder >= 0 && data.displayOrder <= 10000 &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidCollege(data) {
+      return data.name is string && data.name.size() >= 2 && data.name.size() <= 200 &&
+             data.code is string && data.code.size() >= 1 && data.code.size() <= 40 &&
+             data.university is string && data.university.size() <= 160 &&
+             (!('address' in data) || (data.address is string && data.address.size() <= 300)) &&
+             data.city is string && data.city.size() >= 1 && data.city.size() <= 80 &&
+             data.district is string && data.district.size() >= 1 && data.district.size() <= 80 &&
+             data.state is string && data.state.size() >= 1 && data.state.size() <= 80 &&
+             data.collegeType in ['GOVERNMENT', 'GOVT_AIDED', 'PRIVATE', 'AUTONOMOUS'] &&
+             data.courseIds is list && data.courseIds.size() <= 20 &&
+             (data.courseIds.size() == 0 || data.courseIds[0] is string) &&
+             data.branches is list && data.branches.size() <= 30 &&
+             data.cutoffs is list && data.cutoffs.size() <= 80 &&
+             (!('scholarships' in data) || (data.scholarships is string && data.scholarships.size() <= 500)) &&
+             (!('eligibility' in data) || (data.eligibility is string && data.eligibility.size() <= 500)) &&
+             (!('placementAvgLpa' in data) || (data.placementAvgLpa is number && data.placementAvgLpa >= 0 && data.placementAvgLpa <= 500)) &&
+             (!('placementHighLpa' in data) || (data.placementHighLpa is number && data.placementHighLpa >= 0 && data.placementHighLpa <= 500)) &&
+             (!('placementRate' in data) || (data.placementRate is int && data.placementRate >= 0 && data.placementRate <= 100)) &&
+             data.hostelAvailable is bool &&
+             (!('hostelSummary' in data) || (data.hostelSummary is string && data.hostelSummary.size() <= 400)) &&
+             (!('website' in data) || (data.website is string && data.website.size() <= 250)) &&
+             (!('contactEmail' in data) || (data.contactEmail is string && data.contactEmail.size() <= 160)) &&
+             (!('contactPhone' in data) || (data.contactPhone is string && data.contactPhone.size() <= 40)) &&
+             (!('description' in data) || (data.description is string && data.description.size() <= 1500)) &&
+             (!('imageKey' in data) || (data.imageKey is string && data.imageKey.size() <= 80)) &&
+             data.active is bool &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidPackage(data) {
+      return data.name is string && data.name.size() >= 2 && data.name.size() <= 120 &&
+             data.description is string && data.description.size() <= 1000 &&
+             data.tier in ['BASIC', 'STANDARD', 'PREMIUM', 'COMBO'] &&
+             data.courseIds is list && data.courseIds.size() <= 20 &&
+             data.originalPrice is int && data.originalPrice >= 0 && data.originalPrice <= 5000000 &&
+             data.discountType in ['NONE', 'FIXED', 'PERCENT'] &&
+             data.discountValue is int && data.discountValue >= 0 && data.discountValue <= 5000000 &&
+             data.finalPrice is int && data.finalPrice >= 0 && data.finalPrice <= data.originalPrice &&
+             data.features is list && data.features.size() <= 20 &&
+             (data.features.size() == 0 || data.features[0] is string) &&
+             data.validityDays is int && data.validityDays >= 1 && data.validityDays <= 3650 &&
+             data.displayOrder is int && data.displayOrder >= 0 && data.displayOrder <= 1000 &&
+             data.active is bool &&
+             data.combo is bool &&
+             (!('includedPackageIds' in data) || (data.includedPackageIds is list && data.includedPackageIds.size() <= 10)) &&
+             (!('promoCode' in data) || (data.promoCode is string && data.promoCode.size() <= 40)) &&
+             (!('maxUsage' in data) || (data.maxUsage is int && data.maxUsage >= 0)) &&
+             (!('usedCount' in data) || (data.usedCount is int && data.usedCount >= 0)) &&
+             (!('validUntilEpochMs' in data) || data.validUntilEpochMs is int) &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidPromoCode(data) {
+      return data.code is string && data.code.size() >= 2 && data.code.size() <= 40 &&
+             data.discountType in ['FIXED', 'PERCENT'] &&
+             data.discountValue is int && data.discountValue >= 1 && data.discountValue <= 500000 &&
+             data.minOrderAmount is int && data.minOrderAmount >= 0 &&
+             data.maxUsage is int && data.maxUsage >= 1 &&
+             data.usedCount is int && data.usedCount >= 0 &&
+             data.active is bool &&
+             data.expiryEpochMs is int &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidShortlistItem(data) {
+      return data.userId is string && data.userId == request.auth.uid &&
+             data.collegeId is string && data.collegeId.size() >= 1 && data.collegeId.size() <= 128 &&
+             data.collegeName is string && data.collegeName.size() >= 1 && data.collegeName.size() <= 200 &&
+             data.city is string && data.city.size() <= 80 &&
+             (!('note' in data) || (data.note is string && data.note.size() <= 500)) &&
+             data.priority is int && data.priority >= 0 && data.priority <= 1000 &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidPreferenceList(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.studentCode is string && data.studentCode.size() <= 40 &&
+             data.studentName is string && data.studentName.size() >= 1 && data.studentName.size() <= 120 &&
+             (!('mobile' in data) || (data.mobile is string && data.mobile.size() <= 20)) &&
+             data.courseId is string && data.courseId.size() <= 128 &&
+             data.courseName is string && data.courseName.size() <= 120 &&
+             (!('percentile' in data) || (data.percentile is number && data.percentile >= 0 && data.percentile <= 100)) &&
+             (!('examScore' in data) || (data.examScore is number && data.examScore >= 0 && data.examScore <= 1000)) &&
+             (!('rank' in data) || (data.rank is int && data.rank >= 0)) &&
+             (!('category' in data) || (data.category is string && data.category.size() <= 40)) &&
+             (!('packageTier' in data) || (data.packageTier is string && data.packageTier.size() <= 40)) &&
+             data.items is list && data.items.size() <= 100 &&
+             data.status in ['DRAFT', 'SUBMITTED', 'REVIEWED', 'LOCKED'] &&
+             (!('assignedCounsellorId' in data) || (data.assignedCounsellorId is string && data.assignedCounsellorId.size() <= 128)) &&
+             (!('assignedCounsellorName' in data) || (data.assignedCounsellorName is string && data.assignedCounsellorName.size() <= 120)) &&
+             (!('counsellingStatus' in data) || (data.counsellingStatus is string && data.counsellingStatus.size() <= 40)) &&
+             (!('adminNotes' in data) || (data.adminNotes is string && data.adminNotes.size() <= 1000)) &&
+             (!('submittedAtEpochMs' in data) || data.submittedAtEpochMs is int) &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidPaymentRecord(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.studentName is string && data.studentName.size() >= 1 && data.studentName.size() <= 120 &&
+             (!('studentEmail' in data) || (data.studentEmail is string && data.studentEmail.size() <= 200)) &&
+             data.packageId is string && data.packageId.size() >= 1 && data.packageId.size() <= 128 &&
+             data.packageName is string && data.packageName.size() >= 1 && data.packageName.size() <= 120 &&
+             data.packageTier in ['BASIC', 'STANDARD', 'PREMIUM', 'COMBO'] &&
+             data.originalAmount is int && data.originalAmount >= 0 &&
+             data.discountAmount is int && data.discountAmount >= 0 &&
+             (!('promoCode' in data) || (data.promoCode is string && data.promoCode.size() <= 40)) &&
+             data.finalAmount is int && data.finalAmount >= 0 && data.finalAmount <= data.originalAmount &&
+             data.currency == 'INR' &&
+             data.gatewayOrderId is string && data.gatewayOrderId.size() >= 4 && data.gatewayOrderId.size() <= 128 &&
+             (!('gatewayPaymentId' in data) || (data.gatewayPaymentId is string && data.gatewayPaymentId.size() <= 128)) &&
+             (!('gatewaySignature' in data) || (data.gatewaySignature is string && data.gatewaySignature.size() <= 256)) &&
+             (!('paymentMethod' in data) || (data.paymentMethod is string && data.paymentMethod.size() <= 60)) &&
+             data.mode in ['SANDBOX', 'LIVE'] &&
+             data.status in ['INITIATED', 'PENDING', 'SUCCESS', 'FAILED', 'CANCELLED', 'REFUND_INITIATED', 'REFUNDED'] &&
+             (!('receiptNumber' in data) || (data.receiptNumber is string && data.receiptNumber.size() <= 60)) &&
+             (!('failureReason' in data) || (data.failureReason is string && data.failureReason.size() <= 300)) &&
+             data.verifiedByBackend is bool &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidStudentPackage(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.packageId is string && data.packageId.size() >= 1 && data.packageId.size() <= 128 &&
+             data.packageName is string && data.packageName.size() >= 1 && data.packageName.size() <= 120 &&
+             data.tier in ['BASIC', 'STANDARD', 'PREMIUM', 'COMBO'] &&
+             data.paymentId is string && data.paymentId.size() >= 1 && data.paymentId.size() <= 128 &&
+             data.features is list && data.features.size() <= 20 &&
+             data.active is bool &&
+             data.activatedAtEpochMs is int && data.activatedAtEpochMs > 0 &&
+             data.expiresAtEpochMs is int && data.expiresAtEpochMs >= data.activatedAtEpochMs &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidAppointment(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.studentName is string && data.studentName.size() >= 1 && data.studentName.size() <= 120 &&
+             (!('mobile' in data) || (data.mobile is string && data.mobile.size() <= 20)) &&
+             (!('courseName' in data) || (data.courseName is string && data.courseName.size() <= 120)) &&
+             (!('counsellorId' in data) || (data.counsellorId is string && data.counsellorId.size() <= 128)) &&
+             (!('counsellorName' in data) || (data.counsellorName is string && data.counsellorName.size() <= 120)) &&
+             data.topic is string && data.topic.size() >= 2 && data.topic.size() <= 200 &&
+             (!('scheduledDate' in data) || (data.scheduledDate is string && data.scheduledDate.size() <= 40)) &&
+             (!('scheduledSlot' in data) || (data.scheduledSlot is string && data.scheduledSlot.size() <= 60)) &&
+             (!('followUpDate' in data) || (data.followUpDate is string && data.followUpDate.size() <= 40)) &&
+             data.status in ['NEW', 'PENDING', 'CONTACTED', 'SCHEDULED', 'IN_COUNSELLING', 'COMPLETED', 'CANCELLED'] &&
+             (!('notes' in data) || (data.notes is string && data.notes.size() <= 1000)) &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidNotification(data) {
+      return data.title is string && data.title.size() >= 2 && data.title.size() <= 160 &&
+             data.message is string && data.message.size() >= 2 && data.message.size() <= 1000 &&
+             data.type in ['ADMISSION', 'CAP_ROUND', 'CUTOFF', 'PAYMENT', 'PACKAGE', 'COUNSELLING', 'DEADLINE', 'GENERAL'] &&
+             data.targetUserId is string && data.targetUserId.size() >= 1 && data.targetUserId.size() <= 128 &&
+             (!('targetCourseId' in data) || (data.targetCourseId is string && data.targetCourseId.size() <= 128)) &&
+             (!('targetPackageId' in data) || (data.targetPackageId is string && data.targetPackageId.size() <= 128)) &&
+             data.audience in ['ALL', 'PAID', 'UNPAID', 'COURSE', 'PACKAGE', 'STUDENT'] &&
+             (!('createdByUid' in data) || (data.createdByUid is string && data.createdByUid.size() <= 128)) &&
+             isValidTimestamp(data.createdAt);
+    }
+
+    function isValidSupportTicket(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.studentName is string && data.studentName.size() >= 1 && data.studentName.size() <= 120 &&
+             data.subject is string && data.subject.size() >= 2 && data.subject.size() <= 160 &&
+             data.message is string && data.message.size() >= 2 && data.message.size() <= 1500 &&
+             (!('category' in data) || (data.category is string && data.category.size() <= 60)) &&
+             data.status in ['OPEN', 'IN_PROGRESS', 'RESOLVED'] &&
+             (!('adminReply' in data) || (data.adminReply is string && data.adminReply.size() <= 1500)) &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidAuditLog(data) {
+      return data.actorUid is string && data.actorUid == request.auth.uid &&
+             (!('actorEmail' in data) || (data.actorEmail is string && data.actorEmail.size() <= 200)) &&
+             data.action is string && data.action.size() >= 2 && data.action.size() <= 80 &&
+             data.entityType is string && data.entityType.size() >= 2 && data.entityType.size() <= 60 &&
+             data.entityId is string && data.entityId.size() >= 1 && data.entityId.size() <= 128 &&
+             data.summary is string && data.summary.size() >= 1 && data.summary.size() <= 500 &&
+             isValidTimestamp(data.createdAt);
+    }
+
+    function isValidAppConfig(data) {
+      return data.whatsappNumber is string && data.whatsappNumber.size() <= 30 &&
+             data.helplinePhone is string && data.helplinePhone.size() <= 30 &&
+             data.supportEmail is string && data.supportEmail.size() <= 160 &&
+             data.academicYear is string && data.academicYear.size() <= 30 &&
+             data.paymentMode in ['SANDBOX', 'LIVE'] &&
+             (!('backendUrl' in data) || (data.backendUrl is string && data.backendUrl.size() <= 300)) &&
+             (!('announcementBanner' in data) || (data.announcementBanner is string && data.announcementBanner.size() <= 400)) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    // --- COLLECTION RULES ---
+
+    match /admins/{adminUid} {
+      allow get: if isValidId(adminUid) && (isOwner(adminUid) || isSuperAdmin());
+      allow list: if isSuperAdmin();
+      allow create, update: if isValidId(adminUid) && isSuperAdmin() && isValidAdminUser(incoming()) && incoming().uid == adminUid;
+      allow delete: if isValidId(adminUid) && isSuperAdmin();
+    }
+
+    match /courses/{courseId} {
+      allow get: if isValidId(courseId) && isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isValidId(courseId) && isStaffCatalogManager() && isValidCourse(incoming());
+      allow update: if isValidId(courseId) && isStaffCatalogManager() && isValidCourse(incoming()) && incoming().createdAt == existing().createdAt;
+      allow delete: if isValidId(courseId) && isStaffCatalogManager();
+    }
+
+    match /colleges/{collegeId} {
+      allow get: if isValidId(collegeId) && isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isValidId(collegeId) && isStaffCatalogManager() && isValidCollege(incoming());
+      allow update: if isValidId(collegeId) && isStaffCatalogManager() && isValidCollege(incoming()) && incoming().createdAt == existing().createdAt;
+      allow delete: if isValidId(collegeId) && isStaffCatalogManager();
+    }
+
+    match /packages/{packageId} {
+      allow get: if isValidId(packageId) && isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isValidId(packageId) && isStaffCatalogManager() && isValidPackage(incoming());
+      allow update: if isValidId(packageId) && isStaffCatalogManager() && isValidPackage(incoming()) && incoming().createdAt == existing().createdAt;
+      allow delete: if isValidId(packageId) && isStaffCatalogManager();
+    }
+
+    match /promo_codes/{promoId} {
+      allow get: if isValidId(promoId) && isSignedIn();
+      allow list: if isAdmin();
+      allow create: if isValidId(promoId) && isAdmin() && isValidPromoCode(incoming());
+      allow update: if isValidId(promoId) && isAdmin() && isValidPromoCode(incoming()) && incoming().createdAt == existing().createdAt;
+      allow delete: if isValidId(promoId) && isAdmin();
+    }
+
+    match /users/{userId} {
+      allow get: if isValidId(userId) && (isOwner(userId) || isAdmin());
+      allow list: if isAdmin();
+      allow create: if isValidId(userId) && isSignedIn() && isValidStudentProfile(incoming()) && (
+        (isOwner(userId) && incoming().userId == userId && incoming().blocked == false && incoming().counsellingStatus == 'NEW') ||
+        isAdmin()
+      );
+      allow update: if isValidId(userId) && isSignedIn() && isValidStudentProfile(incoming()) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt && (
+        isAdmin() ||
+        (isOwner(userId) &&
+         incoming().blocked == existing().blocked &&
+         incoming().counsellingStatus == existing().counsellingStatus &&
+         incoming().diff(existing()).affectedKeys().hasOnly([
+           'fullName', 'email', 'mobile', 'dob', 'gender', 'state', 'district', 'domicile',
+           'preferredCourseId', 'preferredCourseName', 'entranceExam', 'examScore', 'percentile',
+           'rank', 'category', 'subcategory', 'budgetMax', 'preferredLocations', 'tenthPercent',
+           'twelfthPercent', 'documentChecklist', 'updatedAt'
+         ]))
+      );
+      allow delete: if isValidId(userId) && (isOwner(userId) || isSuperAdmin());
+
+      match /shortlist/{collegeId} {
+        allow get: if isValidId(userId) && isValidId(collegeId) && (isOwner(userId) || isAdmin());
+        allow list: if isValidId(userId) && (isOwner(userId) || isAdmin());
+        allow create: if isValidId(userId) && isValidId(collegeId) && isOwner(userId) && isValidShortlistItem(incoming());
+        allow update: if isValidId(userId) && isValidId(collegeId) && isOwner(userId) && isValidShortlistItem(incoming()) &&
+                         incoming().userId == existing().userId && incoming().createdAt == existing().createdAt;
+        allow delete: if isValidId(userId) && isValidId(collegeId) && isOwner(userId);
+      }
+
+      match /notification_reads/{notificationId} {
+        allow get: if isValidId(userId) && isValidId(notificationId) && isOwner(userId);
+        allow list: if isValidId(userId) && isOwner(userId);
+        allow create, update: if isValidId(userId) && isValidId(notificationId) && isOwner(userId) &&
+                                 incoming().userId == userId &&
+                                 incoming().notificationId == notificationId &&
+                                 isValidTimestamp(incoming().readAt);
+        allow delete: if isValidId(userId) && isValidId(notificationId) && isOwner(userId);
+      }
+    }
+
+    // Strict Privacy: Preference lists accessible ONLY to owning student & authorized Admin/Counsellor
+    match /student_preferences/{prefId} {
+      allow get: if isValidId(prefId) && isSignedIn() && (
+        (resource == null && request.auth.uid == prefId) ||
+        (resource != null && existing().userId == request.auth.uid) ||
+        isStaffCounsellorOrAdmin()
+      );
+      allow list: if isSignedIn() && (
+        existing().userId == request.auth.uid ||
+        isStaffCounsellorOrAdmin()
+      );
+      allow create: if isValidId(prefId) && isSignedIn() && isValidPreferenceList(incoming()) && (
+        (prefId == request.auth.uid && incoming().userId == request.auth.uid && incoming().status in ['DRAFT', 'SUBMITTED']) ||
+        isStaffCounsellorOrAdmin()
+      );
+      allow update: if isValidId(prefId) && isSignedIn() && isValidPreferenceList(incoming()) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt && (
+        isStaffCounsellorOrAdmin() ||
+        (existing().userId == request.auth.uid &&
+         existing().status == 'DRAFT' &&
+         incoming().status in ['DRAFT', 'SUBMITTED'] &&
+         incoming().diff(existing()).affectedKeys().hasOnly([
+           'studentName', 'mobile', 'courseId', 'courseName', 'percentile', 'examScore', 'rank',
+           'category', 'packageTier', 'items', 'status', 'submittedAtEpochMs', 'updatedAt'
+         ]))
+      );
+      allow delete: if isValidId(prefId) && isAdmin();
+    }
+
+    match /payments/{paymentId} {
+      allow get: if isValidId(paymentId) && isSignedIn() && (
+        (resource != null && existing().userId == request.auth.uid) ||
+        isAdmin()
+      );
+      allow list: if isSignedIn() && (
+        existing().userId == request.auth.uid ||
+        isAdmin()
+      );
+      allow create: if isValidId(paymentId) && isSignedIn() && isValidPaymentRecord(incoming()) && (
+        (incoming().userId == request.auth.uid && incoming().status in ['INITIATED', 'PENDING', 'SUCCESS', 'FAILED', 'CANCELLED']) ||
+        isAdmin()
+      );
+      allow update: if isValidId(paymentId) && isSignedIn() && isValidPaymentRecord(incoming()) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().packageId == existing().packageId &&
+                       incoming().finalAmount == existing().finalAmount && (
+        (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'failureReason', 'updatedAt'])) ||
+        (existing().userId == request.auth.uid &&
+         existing().status in ['INITIATED', 'PENDING'] &&
+         incoming().status in ['PENDING', 'SUCCESS', 'FAILED', 'CANCELLED'] &&
+         incoming().diff(existing()).affectedKeys().hasOnly([
+           'status', 'gatewayPaymentId', 'gatewaySignature', 'paymentMethod', 'receiptNumber', 'failureReason', 'verifiedByBackend', 'updatedAt'
+         ]))
+      );
+      allow delete: if false;
+    }
+
+    match /student_packages/{entitlementId} {
+      allow get: if isValidId(entitlementId) && isSignedIn() && (
+        (resource == null && entitlementId.matches('^' + request.auth.uid + '_.*')) ||
+        (resource != null && existing().userId == request.auth.uid) ||
+        isAdmin()
+      );
+      allow list: if isSignedIn() && (
+        existing().userId == request.auth.uid ||
+        isAdmin()
+      );
+      // Atomicity Guarantee (Pillar 7): entitlement creation requires an existing/atomic SUCCESS payment record
+      allow create: if isValidId(entitlementId) && isSignedIn() && isValidStudentPackage(incoming()) && (
+        isAdmin() ||
+        (incoming().userId == request.auth.uid &&
+         existsAfter(/databases/$(database)/documents/payments/$(incoming().paymentId)) &&
+         getAfter(/databases/$(database)/documents/payments/$(incoming().paymentId)).data.userId == request.auth.uid &&
+         getAfter(/databases/$(database)/documents/payments/$(incoming().paymentId)).data.status == 'SUCCESS')
+      );
+      allow update: if isValidId(entitlementId) && isAdmin() && isValidStudentPackage(incoming()) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt;
+      allow delete: if isValidId(entitlementId) && isAdmin();
+    }
+
+    match /counselling_appointments/{appointmentId} {
+      allow get: if isValidId(appointmentId) && isSignedIn() && (
+        (resource != null && existing().userId == request.auth.uid) ||
+        isStaffCounsellorOrAdmin()
+      );
+      allow list: if isSignedIn() && (
+        existing().userId == request.auth.uid ||
+        isStaffCounsellorOrAdmin()
+      );
+      allow create: if isValidId(appointmentId) && isSignedIn() && isValidAppointment(incoming()) && (
+        (incoming().userId == request.auth.uid && incoming().status == 'NEW') ||
+        isStaffCounsellorOrAdmin()
+      );
+      allow update: if isValidId(appointmentId) && isSignedIn() && isValidAppointment(incoming()) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt && (
+        isStaffCounsellorOrAdmin() ||
+        (existing().userId == request.auth.uid &&
+         existing().status in ['NEW', 'PENDING', 'SCHEDULED'] &&
+         incoming().status == 'CANCELLED' &&
+         incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']))
+      );
+      allow delete: if isValidId(appointmentId) && isAdmin();
+    }
+
+    match /notifications/{notificationId} {
+      allow get: if isValidId(notificationId) && isSignedIn() && (
+        existing().targetUserId == request.auth.uid ||
+        existing().targetUserId == 'ALL' ||
+        isAdmin()
+      );
+      allow list: if isSignedIn() && (
+        existing().targetUserId == request.auth.uid ||
+        existing().targetUserId == 'ALL' ||
+        isAdmin()
+      );
+      allow create: if isValidId(notificationId) && isSignedIn() && isValidNotification(incoming()) && (
+        isAdmin() ||
+        (incoming().targetUserId == request.auth.uid && incoming().audience == 'STUDENT' && incoming().type in ['PAYMENT', 'PACKAGE', 'COUNSELLING'])
+      );
+      allow update: if isValidId(notificationId) && isAdmin() && isValidNotification(incoming());
+      allow delete: if isValidId(notificationId) && isAdmin();
+    }
+
+    match /support_tickets/{ticketId} {
+      allow get: if isValidId(ticketId) && isSignedIn() && (
+        (resource != null && existing().userId == request.auth.uid) ||
+        isAdmin()
+      );
+      allow list: if isSignedIn() && (
+        existing().userId == request.auth.uid ||
+        isAdmin()
+      );
+      allow create: if isValidId(ticketId) && isSignedIn() && isValidSupportTicket(incoming()) &&
+                       incoming().userId == request.auth.uid &&
+                       incoming().status == 'OPEN';
+      allow update: if isValidId(ticketId) && isAdmin() && isValidSupportTicket(incoming()) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt;
+      allow delete: if isValidId(ticketId) && isAdmin();
+    }
+
+    match /audit_logs/{logId} {
+      allow get, list: if isAdmin();
+      allow create: if isValidId(logId) && isSignedIn() && isValidAuditLog(incoming());
+      allow update, delete: if false;
+    }
+
+    match /app_config/{docId} {
+      allow get: if isValidId(docId) && isSignedIn();
+      allow list: if isAdmin();
+      allow create, update: if isValidId(docId) && isAdmin() && isValidAppConfig(incoming());
+      allow delete: if false;
+    }
+  }
+}

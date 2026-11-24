@@ -1,0 +1,415 @@
+{
+  "entities": {
+    "AdminUser": {
+      "title": "AdminUser",
+      "description": "Role-based access control record for Super Admin, Admin, Counsellor, and Data Manager accounts.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "role": { "type": "string", "enum": ["SUPER_ADMIN", "ADMIN", "COUNSELLOR", "DATA_MANAGER"] },
+        "permissions": { "type": "array" },
+        "active": { "type": "boolean" },
+        "specialization": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "displayName", "role", "permissions", "active", "createdAt", "updatedAt"]
+    },
+    "StudentProfile": {
+      "title": "StudentProfile",
+      "description": "Student PII, academic profile, exam scores, category, and counselling assignment status.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "studentCode": { "type": "string" },
+        "fullName": { "type": "string" },
+        "email": { "type": "string" },
+        "mobile": { "type": "string" },
+        "dob": { "type": "string" },
+        "gender": { "type": "string" },
+        "state": { "type": "string" },
+        "district": { "type": "string" },
+        "domicile": { "type": "string" },
+        "preferredCourseId": { "type": "string" },
+        "preferredCourseName": { "type": "string" },
+        "entranceExam": { "type": "string" },
+        "examScore": { "type": "number" },
+        "percentile": { "type": "number" },
+        "rank": { "type": "integer" },
+        "category": { "type": "string" },
+        "subcategory": { "type": "string" },
+        "budgetMax": { "type": "integer" },
+        "preferredLocations": { "type": "string" },
+        "tenthPercent": { "type": "number" },
+        "twelfthPercent": { "type": "number" },
+        "counsellingStatus": { "type": "string", "enum": ["NEW", "PENDING", "CONTACTED", "SCHEDULED", "IN_COUNSELLING", "COMPLETED"] },
+        "assignedCounsellorId": { "type": "string" },
+        "assignedCounsellorName": { "type": "string" },
+        "internalNotes": { "type": "string" },
+        "blocked": { "type": "boolean" },
+        "referralCode": { "type": "string" },
+        "documentChecklist": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "studentCode", "fullName", "email", "counsellingStatus", "blocked", "createdAt", "updatedAt"]
+    },
+    "Course": {
+      "title": "Course",
+      "description": "Admission stream or academic course managed by Admin.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "code": { "type": "string" },
+        "description": { "type": "string" },
+        "eligibility": { "type": "string" },
+        "duration": { "type": "string" },
+        "entranceExam": { "type": "string" },
+        "active": { "type": "boolean" },
+        "displayOrder": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "code", "description", "eligibility", "duration", "entranceExam", "active", "displayOrder", "createdAt", "updatedAt"]
+    },
+    "College": {
+      "title": "College",
+      "description": "College directory record with branches, fee structures, historical CAP round cutoffs, and placement stats.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "code": { "type": "string" },
+        "university": { "type": "string" },
+        "address": { "type": "string" },
+        "city": { "type": "string" },
+        "district": { "type": "string" },
+        "state": { "type": "string" },
+        "collegeType": { "type": "string", "enum": ["GOVERNMENT", "GOVT_AIDED", "PRIVATE", "AUTONOMOUS"] },
+        "courseIds": { "type": "array" },
+        "branches": { "type": "array" },
+        "cutoffs": { "type": "array" },
+        "scholarships": { "type": "string" },
+        "eligibility": { "type": "string" },
+        "placementAvgLpa": { "type": "number" },
+        "placementHighLpa": { "type": "number" },
+        "placementRate": { "type": "integer" },
+        "hostelAvailable": { "type": "boolean" },
+        "hostelSummary": { "type": "string" },
+        "website": { "type": "string" },
+        "contactEmail": { "type": "string" },
+        "contactPhone": { "type": "string" },
+        "description": { "type": "string" },
+        "imageKey": { "type": "string" },
+        "active": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "code", "university", "city", "district", "state", "collegeType", "courseIds", "branches", "cutoffs", "hostelAvailable", "active", "createdAt", "updatedAt"]
+    },
+    "CounsellingPackage": {
+      "title": "CounsellingPackage",
+      "description": "Individual or combo counselling package with automatic discount calculation.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "tier": { "type": "string", "enum": ["BASIC", "STANDARD", "PREMIUM", "COMBO"] },
+        "courseIds": { "type": "array" },
+        "originalPrice": { "type": "integer" },
+        "discountType": { "type": "string", "enum": ["NONE", "FIXED", "PERCENT"] },
+        "discountValue": { "type": "integer" },
+        "finalPrice": { "type": "integer" },
+        "features": { "type": "array" },
+        "validityDays": { "type": "integer" },
+        "displayOrder": { "type": "integer" },
+        "active": { "type": "boolean" },
+        "combo": { "type": "boolean" },
+        "includedPackageIds": { "type": "array" },
+        "promoCode": { "type": "string" },
+        "maxUsage": { "type": "integer" },
+        "usedCount": { "type": "integer" },
+        "validUntilEpochMs": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "description", "tier", "courseIds", "originalPrice", "discountType", "discountValue", "finalPrice", "features", "validityDays", "displayOrder", "active", "combo", "createdAt", "updatedAt"]
+    },
+    "PromoCode": {
+      "title": "PromoCode",
+      "description": "Discount promo code managed by Admin.",
+      "type": "object",
+      "properties": {
+        "code": { "type": "string" },
+        "discountType": { "type": "string", "enum": ["FIXED", "PERCENT"] },
+        "discountValue": { "type": "integer" },
+        "minOrderAmount": { "type": "integer" },
+        "maxUsage": { "type": "integer" },
+        "usedCount": { "type": "integer" },
+        "active": { "type": "boolean" },
+        "expiryEpochMs": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["code", "discountType", "discountValue", "minOrderAmount", "maxUsage", "usedCount", "active", "expiryEpochMs", "createdAt", "updatedAt"]
+    },
+    "ShortlistItem": {
+      "title": "ShortlistItem",
+      "description": "Student's shortlisted favorite college with personal notes.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "collegeId": { "type": "string" },
+        "collegeName": { "type": "string" },
+        "city": { "type": "string" },
+        "note": { "type": "string" },
+        "priority": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "collegeId", "collegeName", "city", "priority", "createdAt", "updatedAt"]
+    },
+    "StudentPreferenceList": {
+      "title": "StudentPreferenceList",
+      "description": "Private student college preference list visible ONLY to the student owner and authorized Admins/Counsellors.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "studentCode": { "type": "string" },
+        "studentName": { "type": "string" },
+        "mobile": { "type": "string" },
+        "courseId": { "type": "string" },
+        "courseName": { "type": "string" },
+        "percentile": { "type": "number" },
+        "examScore": { "type": "number" },
+        "rank": { "type": "integer" },
+        "category": { "type": "string" },
+        "packageTier": { "type": "string" },
+        "items": { "type": "array" },
+        "status": { "type": "string", "enum": ["DRAFT", "SUBMITTED", "REVIEWED", "LOCKED"] },
+        "assignedCounsellorId": { "type": "string" },
+        "assignedCounsellorName": { "type": "string" },
+        "counsellingStatus": { "type": "string" },
+        "adminNotes": { "type": "string" },
+        "submittedAtEpochMs": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "studentCode", "studentName", "courseId", "courseName", "items", "status", "createdAt", "updatedAt"]
+    },
+    "PaymentRecord": {
+      "title": "PaymentRecord",
+      "description": "Payment transaction record with Razorpay order/payment IDs, verification status, and receipt number.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "studentName": { "type": "string" },
+        "studentEmail": { "type": "string" },
+        "packageId": { "type": "string" },
+        "packageName": { "type": "string" },
+        "packageTier": { "type": "string" },
+        "originalAmount": { "type": "integer" },
+        "discountAmount": { "type": "integer" },
+        "promoCode": { "type": "string" },
+        "finalAmount": { "type": "integer" },
+        "currency": { "type": "string" },
+        "gatewayOrderId": { "type": "string" },
+        "gatewayPaymentId": { "type": "string" },
+        "gatewaySignature": { "type": "string" },
+        "paymentMethod": { "type": "string" },
+        "mode": { "type": "string", "enum": ["SANDBOX", "LIVE"] },
+        "status": { "type": "string", "enum": ["INITIATED", "PENDING", "SUCCESS", "FAILED", "CANCELLED", "REFUND_INITIATED", "REFUNDED"] },
+        "receiptNumber": { "type": "string" },
+        "failureReason": { "type": "string" },
+        "verifiedByBackend": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "studentName", "packageId", "packageName", "packageTier", "originalAmount", "discountAmount", "finalAmount", "currency", "gatewayOrderId", "mode", "status", "verifiedByBackend", "createdAt", "updatedAt"]
+    },
+    "StudentPackage": {
+      "title": "StudentPackage",
+      "description": "Unlocked counselling package entitlement verified by a PaymentRecord.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "packageId": { "type": "string" },
+        "packageName": { "type": "string" },
+        "tier": { "type": "string", "enum": ["BASIC", "STANDARD", "PREMIUM", "COMBO"] },
+        "paymentId": { "type": "string" },
+        "features": { "type": "array" },
+        "active": { "type": "boolean" },
+        "activatedAtEpochMs": { "type": "integer" },
+        "expiresAtEpochMs": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "packageId", "packageName", "tier", "paymentId", "features", "active", "activatedAtEpochMs", "expiresAtEpochMs", "createdAt", "updatedAt"]
+    },
+    "CounsellingAppointment": {
+      "title": "CounsellingAppointment",
+      "description": "Scheduled counselling session and follow-up record.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "studentName": { "type": "string" },
+        "mobile": { "type": "string" },
+        "courseName": { "type": "string" },
+        "counsellorId": { "type": "string" },
+        "counsellorName": { "type": "string" },
+        "topic": { "type": "string" },
+        "scheduledDate": { "type": "string" },
+        "scheduledSlot": { "type": "string" },
+        "followUpDate": { "type": "string" },
+        "status": { "type": "string", "enum": ["NEW", "PENDING", "CONTACTED", "SCHEDULED", "IN_COUNSELLING", "COMPLETED", "CANCELLED"] },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "studentName", "topic", "status", "createdAt", "updatedAt"]
+    },
+    "AppNotification": {
+      "title": "AppNotification",
+      "description": "Admission update, CAP round alert, or personal payment/counselling notification.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "type": { "type": "string", "enum": ["ADMISSION", "CAP_ROUND", "CUTOFF", "PAYMENT", "PACKAGE", "COUNSELLING", "DEADLINE", "GENERAL"] },
+        "targetUserId": { "type": "string" },
+        "targetCourseId": { "type": "string" },
+        "targetPackageId": { "type": "string" },
+        "audience": { "type": "string", "enum": ["ALL", "PAID", "UNPAID", "COURSE", "PACKAGE", "STUDENT"] },
+        "createdByUid": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "message", "type", "targetUserId", "audience", "createdAt"]
+    },
+    "NotificationRead": {
+      "title": "NotificationRead",
+      "description": "Per-user read receipt for an AppNotification.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "notificationId": { "type": "string" },
+        "readAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "notificationId", "readAt"]
+    },
+    "SupportTicket": {
+      "title": "SupportTicket",
+      "description": "Student support query or feedback item.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "studentName": { "type": "string" },
+        "subject": { "type": "string" },
+        "message": { "type": "string" },
+        "category": { "type": "string" },
+        "status": { "type": "string", "enum": ["OPEN", "IN_PROGRESS", "RESOLVED"] },
+        "adminReply": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "studentName", "subject", "message", "status", "createdAt", "updatedAt"]
+    },
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "Immutable security and transaction audit log.",
+      "type": "object",
+      "properties": {
+        "actorUid": { "type": "string" },
+        "actorEmail": { "type": "string" },
+        "action": { "type": "string" },
+        "entityType": { "type": "string" },
+        "entityId": { "type": "string" },
+        "summary": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["actorUid", "action", "entityType", "entityId", "summary", "createdAt"]
+    },
+    "AppConfig": {
+      "title": "AppConfig",
+      "description": "Global platform configuration managed by Admin.",
+      "type": "object",
+      "properties": {
+        "whatsappNumber": { "type": "string" },
+        "helplinePhone": { "type": "string" },
+        "supportEmail": { "type": "string" },
+        "academicYear": { "type": "string" },
+        "paymentMode": { "type": "string", "enum": ["SANDBOX", "LIVE"] },
+        "backendUrl": { "type": "string" },
+        "announcementBanner": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["whatsappNumber", "helplinePhone", "supportEmail", "academicYear", "paymentMode", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/admins/{adminUid}": {
+      "schema": { "$ref": "#/entities/AdminUser" },
+      "description": "RBAC admin/counsellor records."
+    },
+    "/courses/{courseId}": {
+      "schema": { "$ref": "#/entities/Course" },
+      "description": "Available academic courses."
+    },
+    "/colleges/{collegeId}": {
+      "schema": { "$ref": "#/entities/College" },
+      "description": "Colleges, branches, fees, and CAP round cutoffs."
+    },
+    "/packages/{packageId}": {
+      "schema": { "$ref": "#/entities/CounsellingPackage" },
+      "description": "Counselling packages and combo bundles."
+    },
+    "/promo_codes/{promoId}": {
+      "schema": { "$ref": "#/entities/PromoCode" },
+      "description": "Promo codes for package discounts."
+    },
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/StudentProfile" },
+      "description": "Private student account and academic profile."
+    },
+    "/users/{userId}/shortlist/{collegeId}": {
+      "schema": { "$ref": "#/entities/ShortlistItem" },
+      "description": "Student shortlisted favorite colleges."
+    },
+    "/users/{userId}/notification_reads/{notificationId}": {
+      "schema": { "$ref": "#/entities/NotificationRead" },
+      "description": "Per-student notification read status."
+    },
+    "/student_preferences/{prefId}": {
+      "schema": { "$ref": "#/entities/StudentPreferenceList" },
+      "description": "Private student preference list keyed by userId."
+    },
+    "/payments/{paymentId}": {
+      "schema": { "$ref": "#/entities/PaymentRecord" },
+      "description": "Package payment transactions and receipts."
+    },
+    "/student_packages/{entitlementId}": {
+      "schema": { "$ref": "#/entities/StudentPackage" },
+      "description": "Active unlocked student counselling packages."
+    },
+    "/counselling_appointments/{appointmentId}": {
+      "schema": { "$ref": "#/entities/CounsellingAppointment" },
+      "description": "Counselling appointments and follow-ups."
+    },
+    "/notifications/{notificationId}": {
+      "schema": { "$ref": "#/entities/AppNotification" },
+      "description": "Broadcast and student-targeted admission notifications."
+    },
+    "/support_tickets/{ticketId}": {
+      "schema": { "$ref": "#/entities/SupportTicket" },
+      "description": "Student support tickets and admin responses."
+    },
+    "/audit_logs/{logId}": {
+      "schema": { "$ref": "#/entities/AuditLog" },
+      "description": "Immutable admin and transaction audit log."
+    },
+    "/app_config/{docId}": {
+      "schema": { "$ref": "#/entities/AppConfig" },
+      "description": "Global platform configuration."
+    }
+  }
+}
